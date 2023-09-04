@@ -3,34 +3,43 @@ title: "Bike sharing"
 author: "Maciej"
 date: "2023-08-17"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
-
 ## Scenario
-You are a junior data analyst working in the marketing analyst team at Cyclistic, a bike-share company in Chicago. The director
-of marketing believes the company’s future success depends on maximizing the number of annual memberships. Therefore,
-your team wants to understand how casual riders and annual members use Cyclistic bikes differently. From these insights,
-your team will design a new marketing strategy to convert casual riders into annual members. But first, Cyclistic executives
-must approve your recommendations, so they must be backed up with compelling data insights and professional data
-visualizations.
 
+You are a junior data analyst working in the marketing analyst team at
+Cyclistic, a bike-share company in Chicago. The director of marketing
+believes the company's future success depends on maximizing the number
+of annual memberships. Therefore, your team wants to understand how
+casual riders and annual members use Cyclistic bikes differently. From
+these insights, your team will design a new marketing strategy to
+convert casual riders into annual members. But first, Cyclistic
+executives must approve your recommendations, so they must be backed up
+with compelling data insights and professional data visualizations.
 
 ### Three questions will guide the future marketing program:
-1. How do annual members and casual riders use Cyclistic bikes differently?
-2. Why would casual riders buy Cyclistic annual memberships?
-3. How can Cyclistic use digital media to influence casual riders to become members?
+
+1.  How do annual members and casual riders use Cyclistic bikes
+    differently?
+2.  Why would casual riders buy Cyclistic annual memberships?
+3.  How can Cyclistic use digital media to influence casual riders to
+    become members?
 
 # Bike-share project
+
 The objectives of this project is:
 
-* Grab data from given source : [Link for files](https://divvy-tripdata.s3.amazonaws.com/index.html)
-* Consolidate/aggregate
-data of bike trips from bike-sharing company
-* Make analysis due to business task.
-* Share insights and recommendations
-
+-   Grab data from given source : [Link for
+    files](https://divvy-tripdata.s3.amazonaws.com/index.html)
+-   Consolidate/aggregate data of bike trips from bike-sharing company
+-   Make analysis due to business task.
+-   Share insights and recommendations
 
 ## Installing required packages
+
 ```{r loading packages}
 library(tidyverse)
 library(lubridate)
@@ -41,33 +50,31 @@ library(aws.s3)
 
 ```
 
+## Setting global language
 
-## Setting global language 
 ```{r setting language}
 
 Sys.setlocale("LC_TIME", "C")
 
 ```
 
-
-
-
-
-
 ## Setting enviroment for aws s3
+
 ```{r}
+# this is a big NO NO, sharing keys in public repositories can expose company data
+# Recommended fix: https://docs.oracle.com/en/database/oracle/machine-learning/oml4r/1.5.1/oread/creating-and-modifying-environment-variables-on-windows.html#GUID-DD6F9982-60D5-48F6-8270-A27EC53807D0 
+# something like above, every person that needs to access the data should have personal KEYs 
+# if you don't mind sharing data with others, consider changing s3 bucket accessibility to public.
+# ofc for learning this is a good thing you used s3 and learned some cool things
+# depending on the permissions on those keys I recommend you revoke them in AWS UI
 Sys.setenv("AWS_ACCESS_KEY_ID" = "AKIATCI2ENCEIBNJIINP",
            "AWS_SECRET_ACCESS_KEY" = "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",
            "AWS_DEFAULT_REGION" = "eu-north-1"
            )
 ```
 
-
-
-
-
-
 ## Checking connection to bucket
+
 ```{r}
 bucket_exists(
   bucket = "s3://analitycal-projects-data/", 
@@ -75,56 +82,67 @@ bucket_exists(
 )
 ```
 
-
 ## Listing bucket contents
+
 ```{r}
 
 get_bucket("analitycal-projects-data")
 
 ```
 
-
-
 ## Downloading csv files from bucket
-There is 12 CSV files to download in cyclist_data/csv_files folder. Downloaded files are stored at project directory 
+
+There is 12 CSV files to download in cyclist_data/csv_files folder.
+Downloaded files are stored at project directory
 
 ```{r, eval = FALSE}
+
+
+# nice approach to extend your knowledge you can try to find aws function that will list all files names in the bucket
+# try looking here: https://search.r-project.org/CRAN/refmans/aws.s3/html/get_bucket.html
 
 subfolder = "cyclist_data/csv_files/"
 files_date <- c("2022_08", "2022_09", "2022_10", "2022_11", "2022_12", "2023_01", "2023_02", "2023_03", "2023_04", "2023_05", "2023_06", "2023_07")
 file_ending = "_trip_data.csv"
 
 
+# for better code redability you can try to indent content of code blocks like below:
 for (file_date in files_date) {
-file_path_to_download = paste("cyclist_data/csv_files/",file_date,file_ending,sep="")
+  file_path_to_download = paste("cyclist_data/csv_files/", file_date, file_ending, sep="")
 
-file_path_to_save = paste("data/csv_files/",file_date,file_ending, sep="")
+  file_path_to_save = paste("data/csv_files/", file_date, file_ending, sep="")
 
   save_object(
-  object = file_path_to_download,
-  bucket = "s3://analitycal-projects-data/", 
-  region = "eu-north-1",
-  file = file_path_to_save)
+    object = file_path_to_download,
+    bucket = "s3://analitycal-projects-data/", 
+    region = "eu-north-1",
+    file = file_path_to_save
+  )
  
 }
 
 
 ```
 
+## Setting relative path to csv files
 
-
-## Setting relative path to csv files 
 ```{r}
 main_path <- here("data", "csv_files")
 print(main_path)
 ```
 
 ## Reading CSV files and saving to list
-Reading already downloaded files that are stored at data/csv_files 
+
+Reading already downloaded files that are stored at data/csv_files
+
 ```{r reading csv files}
+
+# you already have those values in vector defined
+# try to reuse variables this brings less confision to the code reader 
 months <- c("2022_08", "2022_09", "2022_10", "2022_11", "2022_12", "2023_01", "2023_02", "2023_03", "2023_04", "2023_05", "2023_06", "2023_07")
 list_of_month_trips <- list()
 
+# nice readable for loop below! 
 for (month in months) {
   file_path <- paste(main_path, paste(month, "_trip_data.csv", sep = ""), sep = "/")
   data <- read.csv(file_path)
@@ -135,6 +153,8 @@ for (month in months) {
 ## Dropping irrelevant columns
 
 ```{r}
+
+# a brief explanation on why those columns are irrelevant could be usefull 
 relevant_columns <- c("ride_id","started_at","ended_at","member_casual")
 list_length = length(list_of_month_trips)
 for(i in 1:list_length)
@@ -142,9 +162,11 @@ for(i in 1:list_length)
   list_of_month_trips[[i]] <- subset(list_of_month_trips[[i]],select=relevant_columns)
   
 }
+
+# This can be achieved by:
+  
+
 ```
-
-
 
 ## Consolidating the 12 datasets into big one df
 
@@ -153,15 +175,14 @@ all_trips <- bind_rows(list_of_month_trips)
 
 ```
 
-
-## Summary 
+## Summary
 
 ```{r summary}
 summary(all_trips)
 head(all_trips)
 ```
 
-## Adding date columns 
+## Adding date columns
 
 ```{r adding date columns}
 all_trips$date <- as.Date(all_trips$started_at) #The default format is yyyy-mm-dd
@@ -172,8 +193,10 @@ all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
 
 ```
 
-## Changing column types 
-Making changes to column type started_at and ended_at from char to posixct due to latter computation - ride_length
+## Changing column types
+
+Making changes to column type started_at and ended_at from char to
+posixct due to latter computation - ride_length
 
 ```{r changing type of columns}
 all_trips$started_at <-as.POSIXct(all_trips$started_at,
@@ -184,9 +207,10 @@ all_trips$ended_at <-as.POSIXct(all_trips$ended_at,
 
 ```
 
-
 ## Adding ride_length column
-Adding ride_length column that compute the difference in seconds between start and end of the trip 
+
+Adding ride_length column that compute the difference in seconds between
+start and end of the trip
 
 ```{r adding ride_length column}
 all_trips$ride_length <- as.numeric(all_trips$ended_at - all_trips$started_at)
@@ -194,7 +218,11 @@ all_trips$ride_length <- as.numeric(all_trips$ended_at - all_trips$started_at)
 ```
 
 ## Filtering and making new subset of records
-Deleting rows that have ride length less than 0 - these rows are irrelevant from analysis point of view and rows that have empty string in member_casual
+
+Deleting rows that have ride length less than 0 - these rows are
+irrelevant from analysis point of view and rows that have empty string
+in member_casual
+
 ```{r filtering and creating new subset}
 
 
@@ -207,15 +235,11 @@ all_trips_v2 <- all_trips %>%
 
 ```
 
+## Comparing members and casual riders
 
+Aggregating groups the unique values in member_casual column and compute
+given statistical value for each group
 
-
-
-
-
-## Comparing members and casual riders 
-Aggregating groups the unique values in member_casual column
-and compute given statistical value for each group 
 ```{r aggregating and compute}
 aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)
 aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)
@@ -224,23 +248,27 @@ aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)
 aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = summary)
 ```
 
+## Defining the order of caterogical values
 
-## Defining the order of caterogical values 
-Making order of day_of_week column and their values without changing the factual order of records
+Making order of day_of_week column and their values without changing the
+factual order of records
+
 ```{r making order}
 all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
 ```
 
+## Aggregating the average ride time
 
-
-## Aggregating the average ride time 
 Aggregating by each day and each member type in ordered manner
+
 ```{r aggregating}
 aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
 ```
 
 ## Plot 1
+
 Comparing the number of rides by each type of membership
+
 ```{r plotting 1}
 data <- all_trips_v2 %>%
   group_by(member_casual) %>%
@@ -259,9 +287,10 @@ print(p)
   
 ```
 
-
 ## Plot 2
+
 Comparing the average duration of rides by each type of membership
+
 ```{r plotting 2}
 data <- all_trips_v2 %>%
   group_by(member_casual) %>%
@@ -280,9 +309,7 @@ print(p)
   
 ```
 
-
 ## Creating and saving comparision of number of rides and average duration grouped by type of member and weekday
-
 
 ```{r creating comparision}
 rides_and_mean_by_day_and_member <- all_trips_v2 %>% 
@@ -295,7 +322,8 @@ rides_and_mean_by_day_and_member <- all_trips_v2 %>%
 ```
 
 ## Plot 3
-Comparing number of rides within each day of week  by member type
+
+Comparing number of rides within each day of week by member type
 
 ```{r plotting 3}
 rides_and_mean_by_day_and_member  %>% 
@@ -307,8 +335,8 @@ rides_and_mean_by_day_and_member  %>%
 
 ```
 
-
 ## Plot 4
+
 Comparing mean of rides within each day of week by member type
 
 ```{r plotting 4}
@@ -321,11 +349,8 @@ rides_and_mean_by_day_and_member %>%
 
 ```
 
-
-
-
-
 ## Plot 5
+
 Comparing number of rides within each month by member type
 
 ```{r plotting 5}
@@ -341,8 +366,8 @@ all_trips_v2 %>%
        x = "Month")
 ```
 
-
 ## Plot 6
+
 Comparing number of rides within each month by member type
 
 ```{r plotting 6}
@@ -358,27 +383,46 @@ all_trips_v2 %>%
        x = "Month")
 ```
 
-
-
-
 ## Questions and answers
 
 #### How do annual members and casual riders use Cyclistic bikes differently?
 
-* Głównie częściej korzystają stali użytkownicy (średnio o 63,8% więcej ), ale dłuzej korzystają zwykli użytkownicy (średnio o 56% więcej)
-* Zwykli korzystają najczęściej w weekendy, stali korzystają najczęściej w tygodniu. W sobote i w niedziele liczba przejazdów sa prawie takie same 
-* W ciagu miesiąca od 1 do 31 średni czas przejazdu jest stały dla stałych użytkowników, a dla zwykłych jest bardziej zróżnicowany 
-* W ciagu roku w obydwu przypadkach widać, że liczba przejzdów wzrasta gdy tempteratura wzrasta
-* To samo tyczy się długości przejazdów, są one nieco dłuzsze gdy jest cieplej 
+> asnwers should be given in english keep whole project in the same language.
+> intepretation could be placed below plots it belogns to
+
+-   Głównie częściej korzystają stali użytkownicy (średnio o 63,8%
+    więcej ), ale dłuzej korzystają zwykli użytkownicy (średnio o 56%
+    więcej)
+-   Zwykli korzystają najczęściej w weekendy, stali korzystają
+    najczęściej w tygodniu. W sobote i w niedziele liczba przejazdów sa
+    prawie takie same
+-   W ciagu miesiąca od 1 do 31 średni czas przejazdu jest stały dla
+    stałych użytkowników, a dla zwykłych jest bardziej zróżnicowany
+-   W ciagu roku w obydwu przypadkach widać, że liczba przejzdów wzrasta
+    gdy tempteratura wzrasta
+-   To samo tyczy się długości przejazdów, są one nieco dłuzsze gdy jest
+    cieplej
 
 #### Why would casual riders buy Cyclistic annual memberships ?
 
-* By zaoszczędzić na przejazdach, ponieważ korzystają z nich dłużej
-* Również może chodzić o wygodę w korzystaniu 
-* Mogą być zachęceni przez kampanie reklamowe
+-   By zaoszczędzić na przejazdach, ponieważ korzystają z nich dłużej
+-   Również może chodzić o wygodę w korzystaniu
+-   Mogą być zachęceni przez kampanie reklamowe
 
 #### How can Cyclistic use digital media to influence casual riders to become members?
 
-* Pomysł na zasadzie, zwrócenia uwagi na długośc przejazdów i wysoki koszt z tym związany - w weekendy zwykli użytkownicy częściej i dłużej korzystają z bike-sharingu. Warto zwrócić uwagę w reklamie by skorzystali oni z rocznego by jescze bardziej skorzystać z usługi oraz zaoszczędzić pieniądze i cieszyć się przy weekndowych przejażdzkach.
-* Widać, że stali klienci korzystają najczęściej w tygodniu i możliwe, że korzystają z tego rozwiązania by dojechać do pracy. Możliwe, że jest jakaś część klientów okazjonalnych, która też dojeżdża do pracy ale nie wykupiła rocznego abonamentu, albo wybiera bike-sharing co jakiś czas przy dojazdach. Warto skupić się na tym by zachęcić ich do częstszych  dojazdów do pracy oraz wykupu rocznego abonamentu.
-* Rekomendacja, która opiera się na zwiększeniu nakładów inwestycyjnych, tuż przed okresem z zwiększoną temperaturą lub w trakcie.
+-   Pomysł na zasadzie, zwrócenia uwagi na długośc przejazdów i wysoki
+    koszt z tym związany - w weekendy zwykli użytkownicy częściej i
+    dłużej korzystają z bike-sharingu. Warto zwrócić uwagę w reklamie by
+    skorzystali oni z rocznego by jescze bardziej skorzystać z usługi
+    oraz zaoszczędzić pieniądze i cieszyć się przy weekndowych
+    przejażdzkach.
+-   Widać, że stali klienci korzystają najczęściej w tygodniu i możliwe,
+    że korzystają z tego rozwiązania by dojechać do pracy. Możliwe, że
+    jest jakaś część klientów okazjonalnych, która też dojeżdża do pracy
+    ale nie wykupiła rocznego abonamentu, albo wybiera bike-sharing co
+    jakiś czas przy dojazdach. Warto skupić się na tym by zachęcić ich
+    do częstszych dojazdów do pracy oraz wykupu rocznego abonamentu.
+-   Rekomendacja, która opiera się na zwiększeniu nakładów
+    inwestycyjnych, tuż przed okresem z zwiększoną temperaturą lub w
+    trakcie.
