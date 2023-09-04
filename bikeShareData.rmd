@@ -1,0 +1,384 @@
+---
+title: "Bike sharing"
+author: "Maciej"
+date: "2023-08-17"
+output: html_document
+---
+
+
+## Scenario
+You are a junior data analyst working in the marketing analyst team at Cyclistic, a bike-share company in Chicago. The director
+of marketing believes the company’s future success depends on maximizing the number of annual memberships. Therefore,
+your team wants to understand how casual riders and annual members use Cyclistic bikes differently. From these insights,
+your team will design a new marketing strategy to convert casual riders into annual members. But first, Cyclistic executives
+must approve your recommendations, so they must be backed up with compelling data insights and professional data
+visualizations.
+
+
+### Three questions will guide the future marketing program:
+1. How do annual members and casual riders use Cyclistic bikes differently?
+2. Why would casual riders buy Cyclistic annual memberships?
+3. How can Cyclistic use digital media to influence casual riders to become members?
+
+# Bike-share project
+The objectives of this project is:
+
+* Grab data from given source : [Link for files](https://divvy-tripdata.s3.amazonaws.com/index.html)
+* Consolidate/aggregate
+data of bike trips from bike-sharing company
+* Make analysis due to business task.
+* Share insights and recommendations
+
+
+## Installing required packages
+```{r loading packages}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+library(here)
+library(aws.s3)
+
+```
+
+
+## Setting global language 
+```{r setting language}
+
+Sys.setlocale("LC_TIME", "C")
+
+```
+
+
+
+
+
+
+## Setting enviroment for aws s3
+```{r}
+Sys.setenv("AWS_ACCESS_KEY_ID" = "AKIATCI2ENCEIBNJIINP",
+           "AWS_SECRET_ACCESS_KEY" = "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",
+           "AWS_DEFAULT_REGION" = "eu-north-1"
+           )
+```
+
+
+
+
+
+
+## Checking connection to bucket
+```{r}
+bucket_exists(
+  bucket = "s3://analitycal-projects-data/", 
+  region = "eu-north-1"
+)
+```
+
+
+## Listing bucket contents
+```{r}
+
+get_bucket("analitycal-projects-data")
+
+```
+
+
+
+## Downloading csv files from bucket
+There is 12 CSV files to download in cyclist_data/csv_files folder. Downloaded files are stored at project directory 
+
+```{r, eval = FALSE}
+
+subfolder = "cyclist_data/csv_files/"
+files_date <- c("2022_08", "2022_09", "2022_10", "2022_11", "2022_12", "2023_01", "2023_02", "2023_03", "2023_04", "2023_05", "2023_06", "2023_07")
+file_ending = "_trip_data.csv"
+
+
+for (file_date in files_date) {
+file_path_to_download = paste("cyclist_data/csv_files/",file_date,file_ending,sep="")
+
+file_path_to_save = paste("data/csv_files/",file_date,file_ending, sep="")
+
+  save_object(
+  object = file_path_to_download,
+  bucket = "s3://analitycal-projects-data/", 
+  region = "eu-north-1",
+  file = file_path_to_save)
+ 
+}
+
+
+```
+
+
+
+## Setting relative path to csv files 
+```{r}
+main_path <- here("data", "csv_files")
+print(main_path)
+```
+
+## Reading CSV files and saving to list
+Reading already downloaded files that are stored at data/csv_files 
+```{r reading csv files}
+months <- c("2022_08", "2022_09", "2022_10", "2022_11", "2022_12", "2023_01", "2023_02", "2023_03", "2023_04", "2023_05", "2023_06", "2023_07")
+list_of_month_trips <- list()
+
+for (month in months) {
+  file_path <- paste(main_path, paste(month, "_trip_data.csv", sep = ""), sep = "/")
+  data <- read.csv(file_path)
+  list_of_month_trips[[month]] <- data
+}
+```
+
+## Dropping irrelevant columns
+
+```{r}
+relevant_columns <- c("ride_id","started_at","ended_at","member_casual")
+list_length = length(list_of_month_trips)
+for(i in 1:list_length)
+{
+  list_of_month_trips[[i]] <- subset(list_of_month_trips[[i]],select=relevant_columns)
+  
+}
+```
+
+
+
+## Consolidating the 12 datasets into big one df
+
+```{r binding rows}
+all_trips <- bind_rows(list_of_month_trips)
+
+```
+
+
+## Summary 
+
+```{r summary}
+summary(all_trips)
+head(all_trips)
+```
+
+## Adding date columns 
+
+```{r adding date columns}
+all_trips$date <- as.Date(all_trips$started_at) #The default format is yyyy-mm-dd
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$year <- format(as.Date(all_trips$date), "%Y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+
+```
+
+## Changing column types 
+Making changes to column type started_at and ended_at from char to posixct due to latter computation - ride_length
+
+```{r changing type of columns}
+all_trips$started_at <-as.POSIXct(all_trips$started_at,
+                                             format = "%Y-%m-%d %H:%M:%S")
+all_trips$ended_at <-as.POSIXct(all_trips$ended_at,
+                                             format = "%Y-%m-%d %H:%M:%S")
+
+
+```
+
+
+## Adding ride_length column
+Adding ride_length column that compute the difference in seconds between start and end of the trip 
+
+```{r adding ride_length column}
+all_trips$ride_length <- as.numeric(all_trips$ended_at - all_trips$started_at)
+
+```
+
+## Filtering and making new subset of records
+Deleting rows that have ride length less than 0 - these rows are irrelevant from analysis point of view and rows that have empty string in member_casual
+```{r filtering and creating new subset}
+
+
+
+all_trips_v2 <- all_trips %>%
+  filter(ride_length > 0, member_casual %in% c("member", "casual"))
+
+
+
+
+```
+
+
+
+
+
+
+
+## Comparing members and casual riders 
+Aggregating groups the unique values in member_casual column
+and compute given statistical value for each group 
+```{r aggregating and compute}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = summary)
+```
+
+
+## Defining the order of caterogical values 
+Making order of day_of_week column and their values without changing the factual order of records
+```{r making order}
+all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+
+
+## Aggregating the average ride time 
+Aggregating by each day and each member type in ordered manner
+```{r aggregating}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+```
+
+## Plot 1
+Comparing the number of rides by each type of membership
+```{r plotting 1}
+data <- all_trips_v2 %>%
+  group_by(member_casual) %>%
+  summarise(number_of_rides = n()) %>%
+  ungroup() %>%
+  mutate(percent_change = ((number_of_rides - lag(number_of_rides)) / lag(number_of_rides)) * 100)
+
+p <- ggplot(data, aes(x = member_casual, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = paste0(round(percent_change, 1), "%")), 
+            position = position_dodge(width = 0.9), vjust = -0.5) +
+  labs(title = "Number of rides with percentage difference",
+       y = "Number of rides",
+       x = "Type of membership")
+print(p)
+  
+```
+
+
+## Plot 2
+Comparing the average duration of rides by each type of membership
+```{r plotting 2}
+data <- all_trips_v2 %>%
+  group_by(member_casual) %>%
+  summarise(average_duration = mean(ride_length)) %>%
+  ungroup() %>%
+  mutate(percent_change = ((average_duration - lag(average_duration)) / lag(average_duration)) * 100)
+
+p <- ggplot(data, aes(x = member_casual, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = paste0(round(percent_change, 1), "%")), 
+            position = position_dodge(width = 0.9), vjust = -0.5) +
+  labs(title = "Average duration of rides with percentage difference",
+       y = "Average duration of rides",
+       x = "Type of membership")
+print(p)
+  
+```
+
+
+## Creating and saving comparision of number of rides and average duration grouped by type of member and weekday
+
+
+```{r creating comparision}
+rides_and_mean_by_day_and_member <- all_trips_v2 %>% 
+  mutate(weekday = day_of_week) %>%  #creates weekday field using wday()
+  group_by(member_casual, weekday) %>%  #groups by usertype and weekday
+  summarise(number_of_rides = n()							#calculates the number of rides and average duration 
+  ,average_duration = mean(ride_length)) %>% 		# calculates the average duration
+  arrange(member_casual, weekday)	
+
+```
+
+## Plot 3
+Comparing number of rides within each day of week  by member type
+
+```{r plotting 3}
+rides_and_mean_by_day_and_member  %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Number of rides by each day of weekday  ",
+       y = "Number of rides",
+       x = "Day of week")
+
+```
+
+
+## Plot 4
+Comparing mean of rides within each day of week by member type
+
+```{r plotting 4}
+rides_and_mean_by_day_and_member %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Mean of rides by each day of weekday  ",
+       y = "Average duration of rides",
+       x = "Day of week")
+
+```
+
+
+
+
+
+## Plot 5
+Comparing number of rides within each month by member type
+
+```{r plotting 5}
+all_trips_v2 %>% 
+  group_by(member_casual, month) %>%
+  summarise(number_of_rides = n() 
+  ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, month) %>%
+  ggplot(aes(x = month, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+    labs(title = "Number of rides by each month",
+       y = "Number of rides",
+       x = "Month")
+```
+
+
+## Plot 6
+Comparing number of rides within each month by member type
+
+```{r plotting 6}
+all_trips_v2 %>% 
+  group_by(member_casual, month) %>%
+  summarise(number_of_rides = n()							
+  ,average_duration = mean(ride_length)) %>% 	
+  arrange(member_casual, month) %>%
+  ggplot(aes(x = month, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+    labs(title = "Mean of rides by each month",
+       y = "Average duration of rides",
+       x = "Month")
+```
+
+
+
+
+## Questions and answers
+
+#### How do annual members and casual riders use Cyclistic bikes differently?
+
+* Głównie częściej korzystają stali użytkownicy (średnio o 63,8% więcej ), ale dłuzej korzystają zwykli użytkownicy (średnio o 56% więcej)
+* Zwykli korzystają najczęściej w weekendy, stali korzystają najczęściej w tygodniu. W sobote i w niedziele liczba przejazdów sa prawie takie same 
+* W ciagu miesiąca od 1 do 31 średni czas przejazdu jest stały dla stałych użytkowników, a dla zwykłych jest bardziej zróżnicowany 
+* W ciagu roku w obydwu przypadkach widać, że liczba przejzdów wzrasta gdy tempteratura wzrasta
+* To samo tyczy się długości przejazdów, są one nieco dłuzsze gdy jest cieplej 
+
+#### Why would casual riders buy Cyclistic annual memberships ?
+
+* By zaoszczędzić na przejazdach, ponieważ korzystają z nich dłużej
+* Również może chodzić o wygodę w korzystaniu 
+* Mogą być zachęceni przez kampanie reklamowe
+
+#### How can Cyclistic use digital media to influence casual riders to become members?
+
+* Pomysł na zasadzie, zwrócenia uwagi na długośc przejazdów i wysoki koszt z tym związany - w weekendy zwykli użytkownicy częściej i dłużej korzystają z bike-sharingu. Warto zwrócić uwagę w reklamie by skorzystali oni z rocznego by jescze bardziej skorzystać z usługi oraz zaoszczędzić pieniądze i cieszyć się przy weekndowych przejażdzkach.
+* Widać, że stali klienci korzystają najczęściej w tygodniu i możliwe, że korzystają z tego rozwiązania by dojechać do pracy. Możliwe, że jest jakaś część klientów okazjonalnych, która też dojeżdża do pracy ale nie wykupiła rocznego abonamentu, albo wybiera bike-sharing co jakiś czas przy dojazdach. Warto skupić się na tym by zachęcić ich do częstszych  dojazdów do pracy oraz wykupu rocznego abonamentu.
+* Rekomendacja, która opiera się na zwiększeniu nakładów inwestycyjnych, tuż przed okresem z zwiększoną temperaturą lub w trakcie.
